@@ -17,8 +17,9 @@ sub import {
 		my $method_name = "Test::BDD::Cucumber::StepFile::$method";
 		my $orig = \&{$method_name};
 		*{$method_name} = sub {
-			my ($regex, $sub) = @_;
-			$orig->($regex, sub {
+			# Ensure we can wrap other wrappers by preserving the arguments
+			my $sub = pop @_;
+			$orig->(@_, sub {
 					my ($c) = @_;
 
 					# TODO - this is rather quick and nasty

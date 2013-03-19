@@ -4,6 +4,7 @@ use warnings;
 package Test::BDD::Cucumber::Ext::ScenarioAccessors;
 
 our ($_c, $_accessors);
+my $IMPORTED;
 
 sub import {
 	my ($class, @to_create) = @_;
@@ -18,9 +19,9 @@ sub import {
 		$_accessors->{$acc} = sub {
 			my ($value) = @_;
 			if ($value) {
-				$_c->stash->{'scenario'}->{'_dsl'}->{$acc} = $value;
+				$_c->stash->{'scenario'}->{$acc} = $value;
 			}
-			return $_c->stash->{'scenario'}->{'_dsl'}->{$acc};
+			return $_c->stash->{'scenario'}->{$acc};
 		};
 
 		# For compilation, we provide this empty sub, which agrees with the
@@ -28,25 +29,28 @@ sub import {
 		*{ $pkg . '::' . $acc } = sub { };
 	}
 
-	# This is deep juju
+	# We needed to add the accessor above. But we don't need to redefine the
+	# StepFile subs.
+	return if $IMPORTED++;
+
 	# We want to extend 4 step file methods: given when then step
 	# We manually export our version of each of these to our calling package
 	# Which wraps the originals
-	# And 'simply' replaces the provided sub with a wrapper sub
+	# And 'simply' replace the provided sub with a wrapper sub
 	# That wrapper sub captures the current step context
 	# And puts our accessor functions into the package for the scope of the
 	# call
 	foreach my $method (qw/ Given When Then Step /) {
 		# I prefer lowercase, so we actually have given and Given
-		my $method_name = 'Test::BDD::Cucumber::StepFile::' . ucfirst($method);
+		my $method_name = 'Test::BDD::Cucumber::StepFile::' . $method;
 		my $orig = \&{ $method_name };
 		*{ $method_name } = sub {
-			my ($regex, $sub) = @_;
+			my $sub = pop @_;
 			# Call the original, method with our wrapped sub which takes the
 			# first argument (the whole context) and then creates a local alias
 			# for each accessor in the calling package. And then finally calls
 			# the sub.
-			$orig->($regex, sub {
+			$orig->(@_, sub {
 					local $_c = shift;
 					my @args = @_;
 
@@ -60,10 +64,6 @@ sub import {
 				});
 		};
 	}
-	# (*It's not really particularly mad I hope... I just wanted the deep juju
-	# comment and over-abundant commenting to unnerve those who might copy
-	# without contemplating the consequences. Personally, this stuff makes me
-	# feel almost lisp-arific)
 }
 
 1;

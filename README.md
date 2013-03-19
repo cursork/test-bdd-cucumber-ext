@@ -11,28 +11,21 @@ The combination of all of them allows the Digest example to be adapted to the
 below. Whether or not this appeals to you more is probably a matter of personal
 taste.
 
-    use Test::More;
-    use Test::BDD::Cucumber::Ext::StepFile;
-    use Test::BDD::Cucumber::Ext::ScenarioAccessors qw/ object /;
-    use Test::BDD::Cucumber::Ext::LowercaseDefinitions;
-    use Test::BDD::Cucumber::Ext::MatchesAsArguments;
-    use Method::Signatures;
-
     given qr/a usable "(\S+)" class/, func ($c, $class) { use_ok( $class ); };
     given qr/a Digest (\S+) object/, func ($c, $type) {
        ok object(Digest->new($type)), "Object created";
     };
 
-    when qr/I've added "(.+)" to the object/, func ($c, $data) {
+    when qr/I've added "(.+)" to the object/, constraints => ['object'], func ($c, $data) {
        object->add( $data );
     };
 
-    when "I've added the following to the object", func ($c) {
+    when "I've added the following to the object", constraints => ['object'], func ($c) {
        object->add( $c->data );
     };
 
-    then qr/the (.+) output is "(.+)"/, func ($c, $digest, $output) {
-       my $method = {base64 => 'b64digest', 'hex' => 'hexdigest' }->{ $digest } ||
+    then qr/the (.+) output is "(.+)"/, constraints => ['object'], func ($c, $digest, $output) {
+       my $method = { base64 => 'b64digest', 'hex' => 'hexdigest' }->{ $digest } ||
            do { fail("Unknown output type $digest"); return };
        is( object->$method, $output );
     };
@@ -66,12 +59,33 @@ Given that one almost always wants to stash a 'something' value inside
 `$c->stash->{'scenario'}->{'something'}`, this module introduces a static
 accessor for the task.
 
-    use Test::BDD::Cucumber::Ext::ScenarioAccessors qw/something/;
+    use Test::BDD::Cucumber::Ext::ScenarioAccessors qw/thing/;
 
     Given qr/I've got a new thing/ => sub {
-        something( MyThing->new );
+        thing( MyThing->new );
     };
 
     When qr/I do something to the thing/ => sub {
-        something->do_it();
+        thing->do_it();
+    };
+
+## Test::BDD::Cucumber::Ext::ScenarioConstraints
+
+If a step assumes the stash to be in some coherent state for it to run at all,
+you may want to declare constraints separately from the step function body.
+That is:
+
+    When qr/i do something to the thing/, constraints => ['thing'] => sub {
+        ...
+    };
+
+... instead of:
+
+    When qr/i do something to the thing/ => sub {
+        my ($c) = @_;
+        if (!$c->stash->{'scenario'}->{'thing'}) {
+            fail('No thing!!!');
+            return;
+        }
+        ...
     };
